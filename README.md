@@ -21,6 +21,7 @@ Loaded via ESM from [esm.sh](https://esm.sh):
 
 - [@noble/post-quantum](https://github.com/paulmillr/noble-post-quantum) — X-Wing KEM
 - [@noble/ciphers](https://github.com/paulmillr/noble-ciphers) — XChaCha20-Poly1305
+- [MVP.css](https://andybrewer.github.io/mvp) — Minimum page styling
 
 ## Wire Format
 

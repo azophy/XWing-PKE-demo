@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🔐 X-Wing + XChaCha20-Poly1305 Demo</title>
-  <link rel="stylesheet" href="https://unpkg.com/mvp.css">
+  <link rel="stylesheet" href="https://esm.sh/mvp.css">
   <style>
     textarea { width: 100%; height: 120px; font-family: monospace; font-size: 12px; }
     .button-group { display: flex; gap: 10px; margin: 10px 0; }
@@ -70,6 +70,36 @@
 
     let currentKeys = null;
 
+    // main encryption + encoding function
+    const encrypt = (message, publicKey) => {
+        const { cipherText: kemCipherText, sharedSecret } = XWing.encapsulate(publicKey);
+        const nonce = randomBytes(24);
+        const cipher = xchacha20poly1305(sharedSecret, nonce);
+        const encrypted =  cipher.encrypt(new TextEncoder().encode(message));
+
+        // Pack: kemCipherText + nonce + encrypted
+        const packed = new Uint8Array(kemCipherText.length + nonce.length + encrypted.length);
+        packed.set(kemCipherText, 0);
+        packed.set(nonce, kemCipherText.length);
+        packed.set(encrypted, kemCipherText.length + nonce.length);
+
+        return toBase64(packed);
+    }
+
+    // main decoding + decryption function
+    const decrypt = (packed, privateKey) => {
+        // Unpack: kemCipherText (1120) + nonce (24) + encrypted (rest)
+        const kemCipherText = packed.slice(0, 1120);
+        const nonce = packed.slice(1120, 1144);
+        const encrypted = packed.slice(1144);
+
+        const sharedSecret = XWing.decapsulate(kemCipherText, privateKey);
+        const cipher = xchacha20poly1305(sharedSecret, nonce);
+        const decrypted = cipher.decrypt(encrypted);
+
+        return new TextDecoder().decode(decrypted);
+    }
+
     // Generate keypair
     document.getElementById('generateBtn').addEventListener('click', () => {
       currentKeys = XWing.keygen();
@@ -84,18 +114,7 @@
         const message = plainTextEl.value;
         if (!message) return alert('Enter a message to encrypt');
 
-        const { cipherText: kemCipherText, sharedSecret } = XWing.encapsulate(publicKey);
-        const nonce = randomBytes(24);
-        const cipher = xchacha20poly1305(sharedSecret, nonce);
-        const encrypted = cipher.encrypt(new TextEncoder().encode(message));
-
-        // Pack: kemCipherText + nonce + encrypted
-        const packed = new Uint8Array(kemCipherText.length + nonce.length + encrypted.length);
-        packed.set(kemCipherText, 0);
-        packed.set(nonce, kemCipherText.length);
-        packed.set(encrypted, kemCipherText.length + nonce.length);
-
-        encryptedTextEl.value = toBase64(packed);
+        encryptedTextEl.value = encrypt(message, publicKey);
       } catch (e) {
         alert('Encryption failed: ' + e.message);
       }
@@ -108,16 +127,7 @@
         const packed = fromBase64(encryptedTextEl.value);
         if (!packed.length) return alert('Enter encrypted text to decrypt');
 
-        // Unpack: kemCipherText (1120) + nonce (24) + encrypted (rest)
-        const kemCipherText = packed.slice(0, 1120);
-        const nonce = packed.slice(1120, 1144);
-        const encrypted = packed.slice(1144);
-
-        const sharedSecret = XWing.decapsulate(kemCipherText, privateKey);
-        const cipher = xchacha20poly1305(sharedSecret, nonce);
-        const decrypted = cipher.decrypt(encrypted);
-
-        plainTextEl.value = new TextDecoder().decode(decrypted);
+        plainTextEl.value = decrypt(packed, privateKey);
       } catch (e) {
         alert('Decryption failed: ' + e.message);
       }
